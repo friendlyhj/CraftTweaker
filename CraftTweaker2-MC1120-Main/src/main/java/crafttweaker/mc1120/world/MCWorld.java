@@ -16,6 +16,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.*;
+import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
 import stanhebben.zenscript.annotations.Optional;
 
@@ -135,7 +136,7 @@ public class MCWorld extends MCBlockAccess implements IWorld {
         if(end == null) {
             end = new MCPosition3f(start.getX() + 1, start.getY() + 1, start.getZ() + 1);
         }
-        return this.world.getEntitiesWithinAABBExcludingEntity(null, new AxisAlignedBB(((BlockPos) start.asBlockPos().getInternal()), ((BlockPos) end.asBlockPos().getInternal()))).stream().map(MCEntity::new).collect(Collectors.toList());
+        return this.world.getEntitiesWithinAABBExcludingEntity(null, new AxisAlignedBB(((BlockPos) start.asBlockPos().getInternal()), ((BlockPos) end.asBlockPos().getInternal()))).stream().map(CraftTweakerMC::getIEntity).collect(Collectors.toList());
     }
     
     @Override
@@ -181,6 +182,28 @@ public class MCWorld extends MCBlockAccess implements IWorld {
 		net.minecraft.block.state.IBlockState state = world.getBlockState(blockPos);
 		ItemStack stack = state.getBlock().getPickBlock(state, CraftTweakerMC.getRayTraceResult(rayTraceResult), world, blockPos, CraftTweakerMC.getPlayer(player));
 		return CraftTweakerMC.getIItemStack(stack);
-	}
+    }
+    
+    @Override
+    public IExplosion createExplosion(IEntity exploder, double x, double y, double z, float strength, boolean causesFire, boolean damagesTerrain) {
+        return CraftTweakerMC.getIExplosion(new Explosion(world, CraftTweakerMC.getEntity(exploder), x, y, z, strength, causesFire, damagesTerrain));
+    }
+
+    @Override
+    public IExplosion performExplosion(IEntity exploder, double x, double y, double z, float strength, boolean causesFire, boolean damagesTerrain) {
+        return CraftTweakerMC.getIExplosion(world.newExplosion(CraftTweakerMC.getEntity(exploder), x, y, z, strength, causesFire, damagesTerrain));
+    }
+
+    /**
+     * Overload for pre-made explosions. Copies vanilla's {@link World#newExplosion(net.minecraft.entity.Entity, double, double, double, float, boolean, boolean)}
+     * in favor of an already-constructed explosion.
+     */
+    @Override
+    public IExplosion performExplosion(IExplosion explosion) {
+        if (net.minecraftforge.event.ForgeEventFactory.onExplosionStart(world, CraftTweakerMC.getExplosion(explosion))) return explosion;
+        explosion.doExplosionA();
+        explosion.doExplosionB(true);
+        return explosion;
+    }
 
 }

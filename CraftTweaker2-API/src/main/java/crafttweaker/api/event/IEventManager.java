@@ -120,6 +120,9 @@ public interface IEventManager {
 
     @ZenMethod
     IEventHandle onPlayerAnvilRepair(IEventHandler<PlayerAnvilRepairEvent> ev);
+    
+    @ZenMethod
+    IEventHandle onPlayerAnvilUpdate(IEventHandler<PlayerAnvilUpdateEvent> ev);
 
     @ZenMethod
     IEventHandle onPlayerSetSpawn(IEventHandler<PlayerSetSpawnEvent> ev);
@@ -132,6 +135,18 @@ public interface IEventManager {
 
     @ZenMethod
     IEventHandle onPlayerTick(IEventHandler<PlayerTickEvent> ev);
+
+    @ZenMethod
+    IEventHandle onClientTick(IEventHandler<ClientTickEvent> ev);
+
+    @ZenMethod
+    IEventHandle onServerTick(IEventHandler<ServerTickEvent> ev);
+
+    @ZenMethod
+    IEventHandle onRenderTick(IEventHandler<RenderTickEvent> ev);
+
+    @ZenMethod
+    IEventHandle onWorldTick(IEventHandler<WorldTickEvent> ev);
 
     @ZenMethod
     IEventHandle onBlockBreak(IEventHandler<BlockBreakEvent> ev);

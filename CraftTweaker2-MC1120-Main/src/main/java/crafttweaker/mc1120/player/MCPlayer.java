@@ -3,6 +3,7 @@ package crafttweaker.mc1120.player;
 import crafttweaker.CraftTweakerAPI;
 import crafttweaker.api.chat.IChatMessage;
 import crafttweaker.api.data.IData;
+import crafttweaker.api.entity.IEntityItem;
 import crafttweaker.api.formatting.IFormattedText;
 import crafttweaker.api.item.IItemStack;
 import crafttweaker.api.minecraft.CraftTweakerMC;
@@ -10,8 +11,10 @@ import crafttweaker.api.player.*;
 import crafttweaker.api.util.Position3f;
 import crafttweaker.mc1120.CraftTweaker;
 import crafttweaker.mc1120.data.NBTConverter;
+import crafttweaker.mc1120.entity.MCEntityItem;
 import crafttweaker.mc1120.entity.MCEntityLivingBase;
 import crafttweaker.mc1120.network.*;
+import java.util.UUID;
 import net.minecraft.entity.player.*;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
@@ -37,6 +40,23 @@ public class MCPlayer extends MCEntityLivingBase implements IPlayer {
     @Override
     public String getName() {
         return player.getName();
+    }
+    
+    @Override
+    public String getUUID() {
+        UUID uuid = null;
+        if (player.getGameProfile() != null) {
+            uuid = EntityPlayer.getUUID(player.getGameProfile());
+        }
+        if(uuid == null) {
+            uuid = EntityPlayer.getOfflineUUID(getName());
+        }
+        if(uuid == null) {
+            CraftTweakerAPI.logError("Could not get UUID for player " + getName());
+            return "";
+        }
+
+        return uuid.toString().toLowerCase();
     }
     
     @Override
@@ -245,5 +265,15 @@ public class MCPlayer extends MCEntityLivingBase implements IPlayer {
     @Override
     public void setCanEdit(boolean canEdit) {
         player.capabilities.allowEdit = canEdit;
+    }
+    
+    @Override
+    public IEntityItem dropItem(boolean dropAll) {
+        return new MCEntityItem(player.dropItem(dropAll));
+    }
+    
+    @Override
+    public IEntityItem dropItem(IItemStack item) {
+        return new MCEntityItem(player.dropItem(CraftTweakerMC.getItemStack(item), false));
     }
 }
