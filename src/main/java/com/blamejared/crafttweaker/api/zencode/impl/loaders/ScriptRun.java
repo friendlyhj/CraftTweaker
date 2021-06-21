@@ -1,18 +1,36 @@
 package com.blamejared.crafttweaker.api.zencode.impl.loaders;
 
-import com.blamejared.crafttweaker.*;
-import com.blamejared.crafttweaker.api.*;
-import com.blamejared.crafttweaker.api.zencode.brackets.*;
-import com.blamejared.crafttweaker.impl.logger.*;
-import net.minecraftforge.common.*;
-import org.openzen.zencode.java.*;
-import org.openzen.zencode.shared.*;
-import org.openzen.zenscript.codemodel.*;
-import org.openzen.zenscript.formatter.*;
-import org.openzen.zenscript.lexer.*;
+import com.blamejared.crafttweaker.CraftTweaker;
+import com.blamejared.crafttweaker.api.CraftTweakerAPI;
+import com.blamejared.crafttweaker.api.CraftTweakerRegistry;
+import com.blamejared.crafttweaker.api.ScriptLoadingOptions;
+import com.blamejared.crafttweaker.api.zencode.brackets.CTRegisterBEPEvent;
+import com.blamejared.crafttweaker.api.zencode.brackets.IgnorePrefixCasingBracketParser;
+import com.blamejared.crafttweaker.api.zencode.brackets.ValidatedEscapableBracketParser;
+import com.blamejared.crafttweaker.api.zencode.impl.native_types.CrTJavaNativeConverterBuilder;
+import com.blamejared.crafttweaker.impl.logger.GroupLogger;
+import net.minecraftforge.common.MinecraftForge;
+import org.openzen.zencode.java.ScriptingEngine;
+import org.openzen.zencode.java.module.JavaNativeModule;
+import org.openzen.zencode.java.module.converters.JavaNativeConverterBuilder;
+import org.openzen.zencode.shared.CompileException;
+import org.openzen.zencode.shared.SourceFile;
+import org.openzen.zenscript.codemodel.FunctionParameter;
+import org.openzen.zenscript.codemodel.HighLevelDefinition;
+import org.openzen.zenscript.codemodel.ScriptBlock;
+import org.openzen.zenscript.codemodel.SemanticModule;
+import org.openzen.zenscript.formatter.FileFormatter;
+import org.openzen.zenscript.formatter.ScriptFormattingSettings;
+import org.openzen.zenscript.lexer.ParseException;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 
 public class ScriptRun {
     
@@ -35,7 +53,7 @@ public class ScriptRun {
     }
     
     public boolean isFirstRun() {
-        return scriptLoadingOptions.isFirstRun() || getLoaderActions().isFirstRun();
+        return getLoaderActions().isFirstRun();
     }
     
     public ScriptingEngine getEngine() {
@@ -99,12 +117,12 @@ public class ScriptRun {
         if(scriptLoadingOptions.isExecute()) {
             //Now that we execute, we increment the runCount and therefore it's no longer a first run
             final LoaderActions loaderActions = getLoaderActions();
-            loaderActions.incrementRunCount();
             CraftTweakerAPI.logDebug("This is loader '%s' run #%s", scriptLoadingOptions.getLoaderName(), loaderActions
-                    .getRunCount());
+                    .getRunCount() + 1);
             
             scriptingEngine.registerCompiled(scripts);
             scriptingEngine.run(Collections.emptyMap(), CraftTweaker.class.getClassLoader());
+            loaderActions.incrementRunCount();
             
         } else if(CraftTweakerAPI.DEBUG_MODE) {
             scriptingEngine.createRunUnit().dump(new File("classes"));
@@ -113,43 +131,50 @@ public class ScriptRun {
     
     private void registerModules() throws CompileException {
         final List<JavaNativeModule> modules = new LinkedList<>();
-        
+        final CrTJavaNativeConverterBuilder nativeConverterBuilder = new CrTJavaNativeConverterBuilder();
+    
         //Register crafttweaker module first to assign deps
-        final JavaNativeModule crafttweakerModule = createModule(bep, CraftTweaker.MODID, CraftTweaker.MODID);
-        for(Class<?> aClass : CraftTweakerRegistry.getZenGlobals()) {
-            crafttweakerModule.addGlobals(aClass);
-        }
+        final JavaNativeModule crafttweakerModule = createModule(bep, CraftTweaker.MODID, CraftTweaker.MODID, nativeConverterBuilder);
+        
         scriptingEngine.registerNativeProvided(crafttweakerModule);
         modules.add(crafttweakerModule);
         
         final HashSet<String> rootPackages = new HashSet<>(CraftTweakerRegistry.getRootPackages());
         rootPackages.remove(CraftTweaker.MODID);
         for(String rootPackage : rootPackages) {
-            final JavaNativeModule module = createModule(bep, rootPackage, rootPackage, crafttweakerModule);
+            final JavaNativeModule module = createModule(bep, rootPackage, rootPackage, nativeConverterBuilder, crafttweakerModule);
             scriptingEngine.registerNativeProvided(module);
             modules.add(module);
         }
         
         
-        final JavaNativeModule expModule = createModule(bep, "expansions", "", modules.toArray(new JavaNativeModule[0]));
+        final JavaNativeModule expModule = createModule(bep, "expansions", "", nativeConverterBuilder, modules.toArray(new JavaNativeModule[0]));
         for(List<Class<?>> expansionList : CraftTweakerRegistry.getExpansions().values()) {
             for(Class<?> expansionClass : expansionList) {
                 expModule.addClass(expansionClass);
             }
         }
+    
         scriptingEngine.registerNativeProvided(expModule);
+        
+        nativeConverterBuilder.headerConverter.reinitializeAllLazyValues();
     }
     
-    private JavaNativeModule createModule(IgnorePrefixCasingBracketParser bep, String moduleName, String basePackage, JavaNativeModule... dependencies) {
-        JavaNativeModule module = scriptingEngine.createNativeModule(moduleName, basePackage, dependencies);
+    private JavaNativeModule createModule(IgnorePrefixCasingBracketParser bep, String moduleName, String basePackage, JavaNativeConverterBuilder nativeConverterBuilder, JavaNativeModule... dependencies) {
+        JavaNativeModule module = scriptingEngine.createNativeModule(moduleName, basePackage, dependencies, nativeConverterBuilder);
+        
+        
         for(ValidatedEscapableBracketParser bracketResolver : CraftTweakerRegistry.getBracketResolvers(moduleName, scriptingEngine, module)) {
             bep.register(bracketResolver.getName(), bracketResolver);
         }
         module.registerBEP(bep);
-        
+        for(Class<?> aClass : CraftTweakerRegistry.getGlobalsInPackage(moduleName)) {
+            module.addGlobals(aClass);
+        }
         for(Class<?> aClass : CraftTweakerRegistry.getClassesInPackage(moduleName)) {
             module.addClass(aClass);
         }
+        
         return module;
     }
     

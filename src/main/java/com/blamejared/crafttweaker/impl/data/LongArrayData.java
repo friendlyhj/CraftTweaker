@@ -11,7 +11,6 @@ import net.minecraft.nbt.NumberNBT;
 import org.openzen.zencode.java.ZenCodeType;
 
 import java.util.*;
-import java.util.stream.*;
 
 /**
  * @docParam this [100000, 800000, 50000]
@@ -21,7 +20,7 @@ import java.util.stream.*;
 @Document("vanilla/api/data/LongArrayData")
 public class LongArrayData implements ICollectionData {
     
-    private LongArrayNBT internal;
+    private final LongArrayNBT internal;
     
     public LongArrayData(LongArrayNBT internal) {
         this.internal = internal;
@@ -34,7 +33,7 @@ public class LongArrayData implements ICollectionData {
     
     @Override
     public IData copy() {
-        return new LongArrayData(internal);
+        return new LongArrayData(getInternal());
     }
     
     @Override
@@ -50,7 +49,7 @@ public class LongArrayData implements ICollectionData {
     @Override
     public LongData setAt(int index, IData value) {
         if(value instanceof NumberNBT) {
-            return new LongData(internal.set(index, LongNBT.valueOf(((INumberData) value).getLong())));
+            return new LongData(getInternal().set(index, LongNBT.valueOf(((INumberData) value).getLong())));
         } else {
             return null;
         }
@@ -60,35 +59,35 @@ public class LongArrayData implements ICollectionData {
     @Override
     public void add(int index, IData value) {
         if(value instanceof INumberData) {
-            internal.add(index, LongNBT.valueOf(((INumberData) value).getInt()));
+            getInternal().add(index, LongNBT.valueOf(((INumberData) value).getInt()));
         }
     }
     
     @Override
     public void add(IData value) {
         if(value instanceof INumberData) {
-            internal.add(LongNBT.valueOf(((INumberData) value).getInt()));
+            getInternal().add(LongNBT.valueOf(((INumberData) value).getInt()));
         }
     }
     
     @Override
     public LongData remove(int index) {
-        return new LongData(internal.remove(index));
+        return new LongData(getInternal().remove(index));
     }
     
     @Override
     public IData getAt(int index) {
-        return new LongData(internal.get(index));
+        return new LongData(getInternal().get(index));
     }
     
     @Override
     public int size() {
-        return internal.size();
+        return getInternal().size();
     }
     
     @Override
     public void clear() {
-        internal.clear();
+        getInternal().clear();
     }
     
     
@@ -97,7 +96,7 @@ public class LongArrayData implements ICollectionData {
         StringBuilder result = new StringBuilder();
         result.append('[');
         boolean first = true;
-        for(LongNBT nbt : internal) {
+        for(LongNBT nbt : getInternal()) {
             if(first) {
                 first = false;
             } else {
@@ -111,7 +110,7 @@ public class LongArrayData implements ICollectionData {
     
     @Override
     public List<IData> asList() {
-        final long[] asLongArray = internal.getAsLongArray();
+        final long[] asLongArray = getInternal().getAsLongArray();
         List<IData> list = new ArrayList<>(asLongArray.length);
         for(long l : asLongArray) {
             list.add(new LongData(l));

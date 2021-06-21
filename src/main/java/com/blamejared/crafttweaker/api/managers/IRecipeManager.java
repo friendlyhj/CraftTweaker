@@ -7,8 +7,10 @@ import com.blamejared.crafttweaker.api.brackets.CommandStringDisplayable;
 import com.blamejared.crafttweaker.api.data.IData;
 import com.blamejared.crafttweaker.api.item.IIngredient;
 import com.blamejared.crafttweaker.api.item.IItemStack;
+import com.blamejared.crafttweaker.api.zencode.impl.util.PositionUtil;
 import com.blamejared.crafttweaker.impl.actions.recipes.ActionAddRecipe;
 import com.blamejared.crafttweaker.impl.actions.recipes.ActionRemoveAll;
+import com.blamejared.crafttweaker.impl.actions.recipes.ActionRemoveRecipe;
 import com.blamejared.crafttweaker.impl.actions.recipes.ActionRemoveRecipeByModid;
 import com.blamejared.crafttweaker.impl.actions.recipes.ActionRemoveRecipeByName;
 import com.blamejared.crafttweaker.impl.actions.recipes.ActionRemoveRecipeByOutput;
@@ -17,6 +19,7 @@ import com.blamejared.crafttweaker.impl.data.MapData;
 import com.blamejared.crafttweaker.impl.item.MCItemStackMutable;
 import com.blamejared.crafttweaker.impl.managers.CTCraftingTableManager;
 import com.blamejared.crafttweaker.impl.recipes.wrappers.WrapperRecipe;
+import com.blamejared.crafttweaker.impl.util.NameUtils;
 import com.blamejared.crafttweaker_annotations.annotations.Document;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -25,8 +28,11 @@ import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.item.crafting.IRecipeType;
 import net.minecraft.item.crafting.RecipeManager;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.ResourceLocationException;
 import net.minecraft.util.registry.Registry;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.openzen.zencode.java.ZenCodeType;
+import org.openzen.zencode.shared.CodePosition;
 
 import java.util.HashMap;
 import java.util.List;
@@ -62,15 +68,33 @@ public interface IRecipeManager extends CommandStringDisplayable {
         }
         MapData mapData = (MapData) data;
         JsonObject recipeObject = JSON_RECIPE_GSON.fromJson(mapData.toJsonString(), JsonObject.class);
-        String recipeTypeKey = getBracketResourceLocation().toString();
+        ResourceLocation recipeTypeKey = getBracketResourceLocation();
         
         if(recipeObject.has("type")) {
-            if(!recipeObject.get("type").getAsString().equals(recipeTypeKey))
-                throw new IllegalArgumentException("Cannot override recipe type! Given: \"" + recipeObject.get("type").getAsString() + "\", Expected: \"" + recipeTypeKey + "\"");
+            ResourceLocation recipeSerializerKey;
+            try {
+                recipeSerializerKey = new ResourceLocation(recipeObject.get("type").getAsString());
+            } catch(ClassCastException | IllegalStateException | ResourceLocationException ex) {
+                throw new IllegalArgumentException("Expected \"type\" field to be a valid resource location.", ex);
+            }
+            if(!ForgeRegistries.RECIPE_SERIALIZERS.containsKey(recipeSerializerKey)) {
+                throw new IllegalArgumentException("Recipe Serializer \"" + recipeSerializerKey + "\" does not exist.");
+            }
         } else {
-            recipeObject.addProperty("type", recipeTypeKey);
+            if(ForgeRegistries.RECIPE_SERIALIZERS.containsKey(recipeTypeKey)) {
+                recipeObject.addProperty("type", recipeTypeKey.toString());
+            } else {
+                throw new IllegalArgumentException("Recipe Type \"" + recipeTypeKey + "\" does not have a Recipe Serializer of the same ID."
+                        + " Please specify a serializer manually using the \"type\" field in the JSON object.");
+            }
         }
         IRecipe<?> iRecipe = RecipeManager.deserializeRecipe(new ResourceLocation(CraftTweaker.MODID, name), recipeObject);
+        IRecipeType<?> recipeType = iRecipe.getType();
+        if(recipeType != getRecipeType()) {
+            throw new IllegalArgumentException("Recipe Serializer \"" + iRecipe.getSerializer().getRegistryName()
+                    + "\" resulted in Recipe Type \"" + Registry.RECIPE_TYPE.getKey(recipeType)
+                    + "\" but expected Recipe Type \"" + recipeTypeKey + "\".");
+        }
         CraftTweakerAPI.apply(new ActionAddRecipe(this, iRecipe, ""));
     }
     
@@ -89,8 +113,23 @@ public interface IRecipeManager extends CommandStringDisplayable {
     }
     
     @ZenCodeType.Method
+    @ZenCodeType.Getter("allRecipes")
     default List<WrapperRecipe> getAllRecipes() {
         return getRecipes().values().stream().map(WrapperRecipe::new).collect(Collectors.toList());
+    }
+    
+    /**
+     * Returns a map of all known recipes.
+     *
+     * @return A Map of recipe name to recipe of all known recipes.
+     */
+    @ZenCodeType.Method
+    @ZenCodeType.Getter("recipeMap")
+    default Map<ResourceLocation, WrapperRecipe> getRecipeMap() {
+    
+        return getRecipes().entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> new WrapperRecipe(entry
+                        .getValue())));
     }
     
     /**
@@ -98,11 +137,36 @@ public interface IRecipeManager extends CommandStringDisplayable {
      *
      * @param output output of the recipe
      *
+     * @docParam output <tag:items:minecraft:wool>
+     */
+    @ZenCodeType.Method
+    default void removeRecipe(IIngredient output) {
+        CraftTweakerAPI.apply(new ActionRemoveRecipeByOutput(this, output));
+    }
+    
+    // This is only here for backwards compat, should be removed next breaking change
+    /**
+     * Removes a recipe based on it's output.
+     *
+     * @param output output of the recipe
+     *
      * @docParam output <item:minecraft:glass>
      */
     @ZenCodeType.Method
-    default void removeRecipe(IItemStack output) {
-        CraftTweakerAPI.apply(new ActionRemoveRecipeByOutput(this, output));
+    default void removeRecipe(IItemStack output){
+        removeRecipe((IIngredient) output);
+    }
+    
+    /**
+     * Removes all recipes who's input contains the given IItemStack.
+     *
+     * @param input The input IItemStack.
+     *
+     * @docParam input <item:minecraft:ironingot>
+     */
+    @ZenCodeType.Method
+    default void removeRecipeByInput(IItemStack input) {
+        CraftTweakerAPI.apply(new ActionRemoveRecipe(this, iRecipe -> iRecipe.getIngredients().stream().anyMatch(ingredient -> ingredient.test(input.getInternal()))));
     }
     
     /**
@@ -185,11 +249,7 @@ public interface IRecipeManager extends CommandStringDisplayable {
      * @param name name to check
      */
     default String validateRecipeName(String name) {
-        name = fixRecipeName(name);
-        if(!name.chars().allMatch((ch) -> ch == 95 || ch == 45 || ch >= 97 && ch <= 122 || ch >= 48 && ch <= 57 || ch == 47 || ch == 46)) {
-            throw new IllegalArgumentException("Given name does not fit the \"[a-z0-9/._-]\" regex! Name: \"" + name + "\"");
-        }
-        return name;
+        return fixRecipeName(name);
     }
     
     /**
@@ -200,23 +260,17 @@ public interface IRecipeManager extends CommandStringDisplayable {
      * @return fixed name
      */
     default String fixRecipeName(String name) {
-        String fixed = name;
-        if(fixed.indexOf(':') >= 0) {
-            String temp = fixed.replaceAll(":", ".");
-            CraftTweakerAPI.logWarning("Invalid recipe name \"%s\", recipe names cannot have a \":\"! New recipe name: \"%s\"", fixed, temp);
-            fixed = temp;
-        }
-        if(fixed.indexOf(' ') >= 0) {
-            String temp = fixed.replaceAll(" ", ".");
-            CraftTweakerAPI.logWarning("Invalid recipe name \"%s\", recipe names cannot have a \" \"! New recipe name: \"%s\"", fixed, temp);
-            fixed = temp;
-        }
-        if(!fixed.toLowerCase().equals(fixed)) {
-            String temp = fixed.toLowerCase();
-            CraftTweakerAPI.logWarning("Invalid recipe name \"%s\", recipe names have to be lowercase! New recipe name: \"%s\"", fixed, temp);
-            fixed = temp;
-        }
-        return fixed;
+        CodePosition position = PositionUtil.getZCScriptPositionFromStackTrace();
+        return NameUtils.fixing(
+                name,
+                (fixed, mistakes) -> CraftTweakerAPI.logWarning(
+                        "%sInvalid recipe name '%s', mistakes:\n%s\nNew recipe name: %s",
+                        position == CodePosition.UNKNOWN ? "" : position + ": ",
+                        name,
+                        String.join("\n", mistakes),
+                        fixed
+                )
+        );
     }
     
     /**
@@ -269,7 +323,7 @@ public interface IRecipeManager extends CommandStringDisplayable {
     
     @Override
     default String getCommandString() {
-        return "<recipetype:" + getRecipeType().toString() + ">";
+        return "<recipetype:" + getBracketResourceLocation() + ">";
     }
     
 }

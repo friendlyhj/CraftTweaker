@@ -11,7 +11,6 @@ import net.minecraft.nbt.NumberNBT;
 import org.openzen.zencode.java.ZenCodeType;
 
 import java.util.*;
-import java.util.stream.*;
 
 /**
  * @docParam this [4, 1, 2]
@@ -21,7 +20,7 @@ import java.util.stream.*;
 @Document("vanilla/api/data/ByteArrayData")
 public class ByteArrayData implements ICollectionData {
     
-    private ByteArrayNBT internal;
+    private final ByteArrayNBT internal;
     
     public ByteArrayData(ByteArrayNBT internal) {
         this.internal = internal;
@@ -34,7 +33,7 @@ public class ByteArrayData implements ICollectionData {
     
     @Override
     public IData copy() {
-        return new ByteArrayData(internal);
+        return new ByteArrayData(getInternal());
     }
     
     @Override
@@ -50,7 +49,7 @@ public class ByteArrayData implements ICollectionData {
     @Override
     public IData setAt(int index, IData value) {
         if(value instanceof NumberNBT) {
-            return new ByteData(internal.set(index, ByteNBT.valueOf(((INumberData) value).getByte())));
+            return new ByteData(getInternal().set(index, ByteNBT.valueOf(((INumberData) value).getByte())));
         } else {
             return null;
         }
@@ -60,35 +59,35 @@ public class ByteArrayData implements ICollectionData {
     @Override
     public void add(int index, IData value) {
         if(value instanceof INumberData) {
-            internal.add(index, ByteNBT.valueOf(((INumberData) value).getByte()));
+            getInternal().add(index, ByteNBT.valueOf(((INumberData) value).getByte()));
         }
     }
     
     @Override
     public void add(IData value) {
         if(value instanceof INumberData) {
-            internal.add(ByteNBT.valueOf(((INumberData) value).getByte()));
+            getInternal().add(ByteNBT.valueOf(((INumberData) value).getByte()));
         }
     }
     
     @Override
     public IData remove(int index) {
-        return new ByteData(internal.remove(index));
+        return new ByteData(getInternal().remove(index));
     }
     
     @Override
     public IData getAt(int index) {
-        return new ByteData(internal.get(index));
+        return new ByteData(getInternal().get(index));
     }
     
     @Override
     public int size() {
-        return internal.size();
+        return getInternal().size();
     }
     
     @Override
     public void clear() {
-        internal.clear();
+        getInternal().clear();
     }
     
     @Override
@@ -96,7 +95,7 @@ public class ByteArrayData implements ICollectionData {
         StringBuilder result = new StringBuilder();
         result.append("[");
         boolean first = true;
-        for(ByteNBT nbt : internal) {
+        for(ByteNBT nbt : getInternal()) {
             if(first)
                 first = false;
             else
@@ -110,7 +109,7 @@ public class ByteArrayData implements ICollectionData {
     
     @Override
     public List<IData> asList() {
-        final byte[] byteArray = internal.getByteArray();
+        final byte[] byteArray = getInternal().getByteArray();
         final List<IData> out = new ArrayList<>(byteArray.length);
         for(byte b : byteArray) {
             out.add(new ByteData(b));

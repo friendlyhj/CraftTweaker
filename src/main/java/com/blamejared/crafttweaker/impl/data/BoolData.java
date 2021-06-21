@@ -32,31 +32,47 @@ public class BoolData implements IData {
     @ZenCodeType.Caster
     @ZenCodeType.Method
     public ByteData getByteData() {
-        return new ByteData(ByteNBT.valueOf(internal));
+        return new ByteData(ByteNBT.valueOf(getInternalValue()));
     }
     
     @Override
     public IData copy() {
-        return new BoolData(internal);
+        return new BoolData(getInternalValue());
     }
     
     @Override
     public IData copyInternal() {
-        return new BoolData(internal);
+    
+        return new BoolData(getInternalValue());
     }
     
     @Override
     public INBT getInternal() {
+        
         return getByteData().getInternal();
+    }
+    
+    // There is no such thing as a BooleanNBT, it uses the byte nbt, so override this if you need to I guess
+    public boolean getInternalValue(){
+        return internal;
     }
     
     @Override
     public String asString() {
-        return Boolean.toString(internal);
+        
+        return getInternalValue() + " as bool";
+    }
+    
+    @Override
+    public INumberData asNumber() {
+        
+        return new IntData(getInternalValue() ? 1 : 0);
     }
     
     @Override
     public String toJsonString() {
-        return internal + " as bool";
+        
+        return Boolean.toString(getInternalValue());
     }
+    
 }

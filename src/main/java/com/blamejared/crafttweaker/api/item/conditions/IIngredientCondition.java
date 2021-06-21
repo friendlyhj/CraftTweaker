@@ -10,8 +10,8 @@ import net.minecraft.util.ResourceLocation;
 import org.openzen.zencode.java.ZenCodeType;
 
 @ZenRegister
-@ZenCodeType.Name("crafttweaker.api.item.IIngredientTransformer")
-@Document("vanilla/api/items/IIngredientTransformer")
+@ZenCodeType.Name("crafttweaker.api.item.IIngredientCondition")
+@Document("vanilla/api/items/IIngredientCondition")
 public interface IIngredientCondition<T extends IIngredient> {
     
     @ZenCodeType.Method
@@ -22,7 +22,6 @@ public interface IIngredientCondition<T extends IIngredient> {
     
     boolean ignoresDamage();
     
-    @SuppressWarnings("rawtypes")
     IIngredientConditionSerializer getSerializer();
     
     default void write(PacketBuffer buffer) {

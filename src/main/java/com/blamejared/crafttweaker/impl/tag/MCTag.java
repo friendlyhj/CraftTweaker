@@ -1,15 +1,15 @@
 package com.blamejared.crafttweaker.impl.tag;
 
-import com.blamejared.crafttweaker.api.annotations.*;
-import com.blamejared.crafttweaker.api.brackets.*;
-import com.blamejared.crafttweaker.impl.tag.manager.*;
-import com.blamejared.crafttweaker.impl.util.*;
-import com.blamejared.crafttweaker_annotations.annotations.*;
-import net.minecraft.tags.*;
-import net.minecraft.util.*;
-import org.openzen.zencode.java.*;
+import com.blamejared.crafttweaker.api.annotations.ZenRegister;
+import com.blamejared.crafttweaker.api.brackets.CommandStringDisplayable;
+import com.blamejared.crafttweaker.impl.tag.manager.TagManager;
+import com.blamejared.crafttweaker_annotations.annotations.Document;
+import net.minecraft.tags.ITag;
+import net.minecraft.util.ResourceLocation;
+import org.openzen.zencode.java.ZenCodeType;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A reference to a Tag object.
@@ -19,11 +19,12 @@ import java.util.*;
  * A tag will be created as soon as you add
  *
  * @param <T> The elements within this tag.
+ * @docParam this <tag:items:forge:gems>
  */
 @ZenRegister
 @Document("vanilla/api/tags/MCTag")
 @ZenCodeType.Name("crafttweaker.api.tag.MCTag")
-public final class MCTag<T extends CommandStringDisplayable> implements CommandStringDisplayable {
+public final class MCTag<T> implements CommandStringDisplayable {
     
     private final ResourceLocation id;
     private final TagManager<T> manager;
@@ -33,26 +34,55 @@ public final class MCTag<T extends CommandStringDisplayable> implements CommandS
         this.manager = manager;
     }
     
+    /**
+     * Adds the given items to the tag. Creates the tag if it does not exist.
+     *
+     * @param items The items to add. Can be one or more items.
+     * @docParam items <item:minecraft:bedrock>
+     * @docParam items <item:minecraft:iron_ingot>, <item:minecraft:gold_ingot>
+     * @docParam items [<item:minecraft:iron_ingot>, <item:minecraft:gold_ingot>]
+     */
     @SafeVarargs
     @ZenCodeType.Method
     public final void add(T... items) {
         add(Arrays.asList(items));
     }
     
+    /**
+     * Adds the given items to the tag. Creates the tag if it does not exist.
+     *
+     * @param items The items to add. Provided as list.
+     */
     @ZenCodeType.Method
     public void add(List<T> items) {
         manager.addElements(this, items);
     }
     
+    /**
+     * Adds the given tag to this tag. Creates the tag if it does not exist.
+     *
+     * @param tag The tag to add.
+     * @docParam tag <tag:items:forge:rods>
+     */
+    @ZenCodeType.Method
+    public void add(MCTag<T> tag) {
+        add(tag.getElements());
+    }
+    
     @SafeVarargs
     @ZenCodeType.Method
-    public final void remove(T... items){
+    public final void remove(T... items) {
         remove(Arrays.asList(items));
     }
     
     @ZenCodeType.Method
     public void remove(List<T> items) {
         manager.removeElements(this, items);
+    }
+    
+    @ZenCodeType.Method
+    public void remove(MCTag<T> tag) {
+        remove(tag.getElements());
     }
     
     @ZenCodeType.Method
@@ -86,13 +116,25 @@ public final class MCTag<T extends CommandStringDisplayable> implements CommandS
     
     @ZenCodeType.Method
     @ZenCodeType.Getter("id")
-    public MCResourceLocation getId() {
-        return new MCResourceLocation(id);
+    public ResourceLocation getId() {
+        return id;
     }
     
     @ZenCodeType.Operator(ZenCodeType.OperatorType.EQUALS)
-    public boolean equals(MCTag<T> other){
+    public boolean equals(MCTag<T> other) {
         return id.equals(other.id) && manager.equals(other.manager);
+    }
+    
+    @ZenCodeType.Method
+    @ZenCodeType.Operator(ZenCodeType.OperatorType.MUL)
+    public MCTagWithAmount<T> withAmount(int amount) {
+        return new MCTagWithAmount<>(this, amount);
+    }
+    
+    @ZenCodeType.Method
+    @ZenCodeType.Caster(implicit = true)
+    public MCTagWithAmount<T> asTagWithAmount() {
+        return withAmount(1);
     }
     
     public ResourceLocation getIdInternal() {

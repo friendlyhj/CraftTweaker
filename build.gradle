@@ -1,10 +1,13 @@
 buildscript {
     repositories {
         maven {
-            url = 'https://files.minecraftforge.net/maven'
+            url = 'https://maven.minecraftforge.net'
         }
         maven {
-            url = 'https://dist.creeper.host/Sponge/maven'
+            url = 'https://maven.blamejared.com'
+        }
+        maven {
+            url = 'https://repo.spongepowered.org/repository/maven-public'
         }
         maven {
             url "https://plugins.gradle.org/m2/"
@@ -16,25 +19,18 @@ buildscript {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
         classpath group: 'org.spongepowered', name: 'mixingradle', version: '0.7-SNAPSHOT'
         classpath "gradle.plugin.com.matthewprenger:CurseGradle:1.4.0"
+        classpath "gradle.plugin.org.ec4j.gradle:editorconfig-gradle-plugin:0.0.3"
+        classpath group: 'com.blamejared', name: 'ModTemplate', version: '1.+', changing: true
     }
 }
-
-
+apply plugin: 'com.blamejared.modtemplate'
+apply plugin: "org.ec4j.editorconfig"
 apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'org.spongepowered.mixin'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'maven-publish'
 apply plugin: "com.matthewprenger.cursegradle"
-
-apply from: 'https://raw.githubusercontent.com/MinecraftModDevelopment/Gradle-Collection/22e7d543a18cd30675277fbfa3669e3d9e206010/generic/secrets.gradle'
-
-import groovy.json.JsonOutput
-
-if (project.hasProperty('secretFile')) {
-    //noinspection GroovyAssignabilityCheck
-    loadSecrets(new File((String) findProperty('secretFile')))
-}
 
 //apply from: rootProject.file('common.gradle')
 
@@ -43,12 +39,9 @@ subprojects {
 }
 
 version = '7.1.0'
-if (System.getenv('BUILD_NUMBER') != null) {
-    version += "." + System.getenv('BUILD_NUMBER')
-}
 
 group = 'com.blamejared.crafttweaker'
-archivesBaseName = 'CraftTweaker-1.16.4'
+archivesBaseName = 'CraftTweaker-1.16.5'
 
 sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8' // Need this here so eclipse task generates correctly.
 
@@ -59,6 +52,7 @@ if (JavaVersion.current().isJava8Compatible()) {
 
         tasks.withType(Javadoc) {
             options.tags += "docParam"
+            options.tags += "docEvent"
             options.addStringOption('Xdoclint:none', '-quiet')
         }
     }
@@ -73,7 +67,7 @@ repositories {
         url 'https://dogforce-games.com/maven'
     }
     maven {
-        url = 'https://dist.creeper.host/Sponge/maven'
+        url 'https://repo.spongepowered.org/repository/maven-public'
     }
 }
 
@@ -84,7 +78,6 @@ minecraft {
     runs {
         client {
             workingDirectory project.file('run')
-            arg "-mixin.config=crafttweaker.mixins.json"
 
             // Recommended logging data for a userdev environment
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
@@ -97,8 +90,8 @@ minecraft {
         }
 
         server {
-            workingDirectory project.file('run')
-            arg "-mixin.config=crafttweaker.mixins.json"
+            workingDirectory project.file('run_server')
+            arg "nogui"
 
             // Recommended logging data for a userdev environment
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
@@ -113,7 +106,6 @@ minecraft {
 
         data {
             workingDirectory project.file('run')
-            arg "-mixin.config=crafttweaker.mixins.json"
 
             // Recommended logging data for a userdev environment
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
@@ -129,8 +121,27 @@ minecraft {
     }
 }
 
-mixin {
-    add sourceSets.main, "crafttweaker.refmap.json"
+
+modTemplate {
+    mcVersion "1.16.5"
+    curseHomepage "https://www.curseforge.com/minecraft/mc-mods/crafttweaker"
+    displayName "CraftTweaker"
+
+    changelog {
+        enabled true
+        firstCommit "04c6fe182f7e88bdf0cbfbe1739d86ff3c0212f5"
+        repo "https://github.com/CraftTweaker/CraftTweaker"
+    }
+    versionTracker {
+        enabled true
+        author "Jared"
+        projectName "crafttweaker"
+    }
+    webhook {
+        enabled true
+        curseId "239197"
+        avatarUrl "https://media.forgecdn.net/avatars/142/108/636546700830987709.png"
+    }
 }
 
 def zenCodeDeps = [':CodeFormatter', ':CodeFormatterShared', ':JavaIntegration', ':JavaAnnotations', ':JavaBytecodeCompiler', ':JavaShared', ':Validator', ':Parser', ':CodeModel', ':Shared']
@@ -143,8 +154,8 @@ dependencies {
 
     zenCodeDeps.collect { compile project(it) }
 
-    minecraft 'net.minecraftforge:forge:1.16.4-35.0.1'
-//    compile fg.deobf("mezz.jei:jei-1.16.2:7.1.0.11")
+    minecraft 'net.minecraftforge:forge:1.16.5-36.0.14'
+    compile fg.deobf("mezz.jei:jei-1.16.4:7.6.1.65")
 
     testCompile group: "org.junit.jupiter", name: "junit-jupiter", version: "5.4.2"
     testRuntime group: "org.junit.jupiter", name: "junit-jupiter", version: "5.4.2"
@@ -157,31 +168,6 @@ test {
     }
 }
 
-
-task genGitChangelog() {
-    def stdout = new ByteArrayOutputStream()
-    // first commit to check from, in our case the first commit of the branch
-    String firstCommit = "04c6fe182f7e88bdf0cbfbe1739d86ff3c0212f5"
-    String repoLink = "https://github.com/CraftTweaker/CraftTweaker/commit/"
-    // was having issues with grep and spaces in the regex
-    exec {
-        commandLine 'git', 'log', '-i', '--grep=version\\spush', '--grep=open\\sbeta\\sspecific\\scode', '--pretty=tformat:%H', '--date=local', firstCommit + '..@{0}'
-        standardOutput = stdout
-    }
-    if (stdout.toString().trim().indexOf("\n") >= 0) {
-        firstCommit = stdout.toString().split("\n")[0].trim()
-    }
-    System.out.println("Last version hash: \"" + firstCommit + "\"")
-    stdout = new ByteArrayOutputStream()
-    exec {
-        commandLine 'git', 'log', '--pretty=tformat:- [%s](' + repoLink + '%H) - %aN - %cd', '--max-parents=1', '--date=local', firstCommit + "..@"
-        standardOutput = stdout
-    }
-    File file = new File("changelog.md")
-    file.write("### Current version: " + project.version)
-    file.append("\n" + stdout.toString())
-    System.out.println("Changelog generated!")
-}
 
 processResources {
     dependsOn(":StdLibs:zipItUp")
@@ -203,8 +189,7 @@ jar {
                 "Implementation-Title"    : project.name,
                 "Implementation-Version"  : "${version}",
                 "Implementation-Vendor"   : "CraftTweaker",
-                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                "MixinConfigs": "crafttweaker.mixins.json"
+                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
 }
@@ -290,9 +275,10 @@ curseforge {
     apiKey = findProperty('curseforge_api_token') ?: 0
     project {
         id = "239197"
-        releaseType = 'beta'
+        releaseType = 'release'
         changelog = file("changelog.md")
         changelogType = 'markdown'
+        addGameVersion '1.16.4'
 
         mainArtifact(jar) {
             relations {
@@ -303,61 +289,26 @@ curseforge {
     }
 }
 
-task updateVersionTracker {
-
-    onlyIf {
-
-        project.hasProperty('versionTrackerAPI')
-    }
-
-    doLast {
-        def body = [
-                'author'        : "${project.findProperty('versionTrackerAuthor')}",
-                'projectName'   : "crafttweaker",
-                'gameVersion'   : "1.16.4",
-                'projectVersion': "${version}",
-                'homepage'      : "${project.findProperty('versionTrackerHomepage')}",
-                'uid'           : "${project.findProperty('versionTrackerKey')}"
-        ]
-
-        // Opens a connection to the version tracker API and writes the payload JSON.
-        def req = new URL(project.findProperty('versionTrackerAPI')).openConnection()
-        req.setRequestMethod('POST')
-        req.setRequestProperty('Content-Type', 'application/json; charset=UTF-8')
-        req.setRequestProperty('User-Agent', "CraftTweaker Tracker Gradle")
-        req.setDoOutput(true)
-        req.getOutputStream().write(JsonOutput.toJson(body).getBytes("UTF-8"))
-
-        // We need to attempt a read in order to actually send the message.
-        println "VersionCheck Status code: ${req.getResponseCode()}"
-        println "VersionCheck Response: ${req.getInputStream().getText()}"
-    }
-
-}
-
 compileJava {
-    source("wrappedClasses.csv")
+    options.compilerArgs << "-Acrafttweaker.processor.document.output_directory=${file('docsOut')}"
     //options.compilerArgs += ["-Xprefer:source", "-verbose"]
     //options.fork = true
     //options.forkOptions.executable = 'javac'
-    def csv = file("wrappedClasses.csv")
-    options.annotationProcessorGeneratedSourcesDirectory = project.file("src/generated/java")
-    if(csv.exists()) {
-        options.compilerArgs += "-AwrappedClassesCsvLocation=${csv.absolutePath}"
-    }
-}
-
-sourceSets {
-    main {
-        java {
-            srcDirs += "src/generated/java/"
-        }
-    }
 }
 
 idea {
     module {
-        generatedSourceDirs += file("src/generated/java")
         excludeDirs += [file("run"), file("runServer")]
     }
+}
+
+editorconfig {
+
+    // All files are included by default. Paths or patterns must be relative to the the project root directory.
+    includes = ['src/**', 'Crafttweaker_Annotation_Processors/**', 'Crafttweaker_Annotations/**', 'build.gradle', 'common.gradle', 'gradle.properties', 'settings.gradle']
+
+    // Exlude some files in addition to the default excludes
+    // Paths or patterns must be relative to the the project root directory.
+    excludes = ['derby.log', 'LICENSE']
+
 }

@@ -15,7 +15,7 @@ import org.openzen.zencode.java.ZenCodeType;
 @Document("vanilla/api/data/ShortData")
 public class ShortData implements INumberData {
     
-    private ShortNBT internal;
+    private final ShortNBT internal;
     
     public ShortData(ShortNBT internal) {
         this.internal = internal;
@@ -29,7 +29,7 @@ public class ShortData implements INumberData {
     
     @Override
     public IData copy() {
-        return new ShortData(internal);
+        return new ShortData(getInternal());
     }
     
     @Override
@@ -52,6 +52,6 @@ public class ShortData implements INumberData {
     
     @Override
     public String asString() {
-        return internal.getShort() + " as short";
+        return getInternal().getShort() + " as short";
     }
 }

@@ -3,10 +3,12 @@ package com.blamejared.crafttweaker.api;
 import com.blamejared.crafttweaker.api.annotations.ZenRegister;
 import com.blamejared.crafttweaker_annotations.annotations.ZenWrapper;
 import org.openzen.zencode.java.ZenCodeGlobals;
+import org.openzen.zencode.java.ZenCodeType;
 
 import java.lang.reflect.InvocationTargetException;
 
 @ZenRegister
+@ZenCodeType.Name("crafttweaker.api.Globals")
 public class CraftTweakerGlobals {
     
     @ZenCodeGlobals.Global

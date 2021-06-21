@@ -1,6 +1,7 @@
 package com.blamejared.crafttweaker.impl.util;
 
 import com.blamejared.crafttweaker.api.annotations.*;
+import com.blamejared.crafttweaker.impl_native.util.ExpandDirectionAxis;
 import com.blamejared.crafttweaker_annotations.annotations.*;
 import net.minecraft.util.*;
 import org.openzen.zencode.java.*;
@@ -51,12 +52,6 @@ public enum MCDirection {
         return DIRECTION_MAP.get(internal);
     }
     
-    // TODO add this when we have an Entity wrapper
-    
-    //    public static Direction[] getFacingDirections(Entity entityIn) {
-    //        return Direction.getFacingDirections(entityIn);
-    //    }
-    
     /**
      * Get the Index of this direction (0-5). The order is D-U-N-S-W-E
      *
@@ -64,7 +59,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("index")
     public int getIndex() {
-        return internal.getIndex();
+        return getInternal().getIndex();
     }
     
     /**
@@ -74,7 +69,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("horizontalIndex")
     public int getHorizontalIndex() {
-        return internal.getHorizontalIndex();
+        return getInternal().getHorizontalIndex();
     }
     
     /**
@@ -84,7 +79,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("axisOffset")
     public int getAxisOffset() {
-        return internal.getAxisDirection().getOffset();
+        return getInternal().getAxisDirection().getOffset();
     }
     
     /**
@@ -94,7 +89,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("opposite")
     public MCDirection getOpposite() {
-        return DIRECTION_MAP.get(internal.getOpposite());
+        return DIRECTION_MAP.get(getInternal().getOpposite());
     }
     
 
@@ -109,7 +104,7 @@ public enum MCDirection {
 //     * @docParam axis <directionaxis:north>
 //     */
 //    @ZenCodeType.Method
-//    public MCDirection rotateAround(MCDirectionAxis axis) {
+//    public MCDirection rotateAround(ExpandDirectionAxis axis) {
 //        return DIRECTION_MAP.get(internal.rotateAround(axis.getInternal()));
 //    }
     
@@ -120,7 +115,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Method
     public MCDirection rotateY() {
-        return DIRECTION_MAP.get(internal.rotateY());
+        return DIRECTION_MAP.get(getInternal().rotateY());
     }
     
     /**
@@ -130,7 +125,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Method
     public MCDirection rotateYCCW() {
-        return DIRECTION_MAP.get(internal.rotateYCCW());
+        return DIRECTION_MAP.get(getInternal().rotateYCCW());
     }
     
     /**
@@ -140,7 +135,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("xOffset")
     public int getXOffset() {
-        return internal.getXOffset();
+        return getInternal().getXOffset();
     }
     
     /**
@@ -150,7 +145,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("yOffset")
     public int getYOffset() {
-        return internal.getYOffset();
+        return getInternal().getYOffset();
     }
     
     /**
@@ -160,17 +155,17 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("zOffset")
     public int getZOffset() {
-        return internal.getZOffset();
+        return getInternal().getZOffset();
     }
     
     /**
      * Gets the direction axis of this direction
      *
-     * @return a {@link MCDirectionAxis} of this axis
+     * @return a {@link ExpandDirectionAxis} of this axis
      */
     @ZenCodeType.Getter("axis")
-    public MCDirectionAxis getAxis() {
-        return MCDirectionAxis.getAxis(internal.getAxis());
+    public Direction.Axis getAxis() {
+        return getInternal().getAxis();
     }
     
     /**
@@ -180,7 +175,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("horizontalAngle")
     public float getHorizontalAngle() {
-        return internal.getHorizontalAngle();
+        return getInternal().getHorizontalAngle();
     }
     
     /**
@@ -190,7 +185,7 @@ public enum MCDirection {
      */
     @ZenCodeType.Getter("name")
     public String getName() {
-        return internal.getName2();
+        return getInternal().getName2();
     }
     
     public Direction getInternal() {

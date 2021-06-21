@@ -15,7 +15,7 @@ import org.openzen.zencode.java.ZenCodeType;
 @Document("vanilla/api/data/LongData")
 public class LongData implements INumberData {
     
-    private LongNBT internal;
+    private final LongNBT internal;
     
     public LongData(LongNBT internal) {
         this.internal = internal;
@@ -28,7 +28,7 @@ public class LongData implements INumberData {
     
     @Override
     public IData copy() {
-        return new LongData(internal);
+        return new LongData(getInternal());
     }
     
     @Override
@@ -51,6 +51,6 @@ public class LongData implements INumberData {
     
     @Override
     public String asString() {
-        return internal.getLong() + " as long";
+        return getInternal().getLong() + " as long";
     }
 }

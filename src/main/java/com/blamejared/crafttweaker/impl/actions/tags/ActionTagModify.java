@@ -4,7 +4,6 @@ import com.blamejared.crafttweaker.api.logger.ILogger;
 import com.blamejared.crafttweaker.impl.tag.*;
 import com.google.common.collect.*;
 import net.minecraft.tags.*;
-import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.registries.ForgeRegistryEntry;
 
 import java.util.*;
@@ -27,6 +26,7 @@ public abstract class ActionTagModify<T extends ForgeRegistryEntry<?>> extends A
             applyTo(list, set);
             ((Tag<T>) tag).immutableContents = ImmutableList.copyOf(list);
             ((Tag<T>) tag).contents = set;
+            ((Tag<T>) tag).contentsClassType = Tag.getContentsClass(set);
         } else {
             throw new RuntimeException("Only Tag's are supported right now, can't act on: " + tag);
         }

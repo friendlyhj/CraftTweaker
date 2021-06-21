@@ -1,23 +1,44 @@
 package com.blamejared.crafttweaker.impl.brackets;
 
-import com.blamejared.crafttweaker.api.*;
-import com.blamejared.crafttweaker.api.annotations.*;
-import com.blamejared.crafttweaker.api.managers.*;
-import com.blamejared.crafttweaker.api.util.*;
-import com.blamejared.crafttweaker.impl.brackets.util.*;
-import net.minecraft.util.*;
-import org.openzen.zencode.java.*;
-import org.openzen.zencode.shared.*;
-import org.openzen.zenscript.lexer.*;
-import org.openzen.zenscript.parser.*;
-import org.openzen.zenscript.parser.expression.*;
-import org.openzen.zenscript.parser.type.*;
+import com.blamejared.crafttweaker.CraftTweaker;
+import com.blamejared.crafttweaker.api.CraftTweakerAPI;
+import com.blamejared.crafttweaker.api.annotations.ZenRegister;
+import com.blamejared.crafttweaker.api.managers.IRecipeManager;
+import com.blamejared.crafttweaker.api.util.InstantiationUtil;
+import com.blamejared.crafttweaker.impl.brackets.util.ParseUtil;
+import com.blamejared.crafttweaker.impl.managers.RecipeManagerWrapper;
+import com.google.common.collect.ImmutableSet;
+import net.minecraft.item.crafting.IRecipeType;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.registry.Registry;
+import org.openzen.zencode.java.ZenCodeType;
+import org.openzen.zencode.shared.CodePosition;
+import org.openzen.zenscript.lexer.ParseException;
+import org.openzen.zenscript.lexer.ZSTokenParser;
+import org.openzen.zenscript.parser.BracketExpressionParser;
+import org.openzen.zenscript.parser.expression.ParsedCallArguments;
+import org.openzen.zenscript.parser.expression.ParsedExpression;
+import org.openzen.zenscript.parser.expression.ParsedExpressionCall;
+import org.openzen.zenscript.parser.expression.ParsedExpressionCast;
+import org.openzen.zenscript.parser.expression.ParsedExpressionMember;
+import org.openzen.zenscript.parser.expression.ParsedExpressionString;
+import org.openzen.zenscript.parser.expression.ParsedExpressionVariable;
+import org.openzen.zenscript.parser.type.IParsedType;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @ZenRegister
 @ZenCodeType.Name("crafttweaker.api.RecipeTypeBracketHandler")
 public class RecipeTypeBracketHandler implements BracketExpressionParser {
+    
+    private static final Set<ResourceLocation> FILTERED_MANAGERS = ImmutableSet.of(
+            new ResourceLocation(CraftTweaker.MODID, "scripts")
+    );
     
     private static final Map<ResourceLocation, IRecipeManager> registeredTypes = new HashMap<>();
     private static final Map<Class<? extends IRecipeManager>, IRecipeManager> managerInstances = new HashMap<>();
@@ -29,12 +50,31 @@ public class RecipeTypeBracketHandler implements BracketExpressionParser {
         }
     }
     
+    @Deprecated
     public static boolean containsCustomManager(ResourceLocation location) {
         return registeredTypes.containsKey(location);
     }
     
+    @Deprecated
     public static IRecipeManager getCustomManager(ResourceLocation location) {
         return registeredTypes.get(location);
+    }
+    
+    public static Collection<IRecipeManager> getManagerInstances() {
+        return managerInstances.values();
+    }
+    
+    public static IRecipeManager getOrDefault(final ResourceLocation location) {
+        if (FILTERED_MANAGERS.contains(location)) return null;
+        
+        return registeredTypes.computeIfAbsent(location, it -> {
+            final IRecipeType<?> type = Registry.RECIPE_TYPE.getOrDefault(location);
+            return type == null? null : new RecipeManagerWrapper(type);
+        });
+    }
+    
+    public static IRecipeManager getOrDefault(final IRecipeType<?> type) {
+        return getOrDefault(new ResourceLocation(type.toString()));
     }
     
     @ZenCodeType.Method
@@ -46,7 +86,7 @@ public class RecipeTypeBracketHandler implements BracketExpressionParser {
     private void registerRecipeManager(Class<? extends IRecipeManager> managerClass) {
         if(managerInstances.containsKey(managerClass)) {
             final IRecipeManager manager = managerInstances.get(managerClass);
-            registeredTypes.put(manager.getBracketResourceLocation(), manager);
+            registerInstance(manager);
             return;
         }
         
@@ -56,25 +96,41 @@ public class RecipeTypeBracketHandler implements BracketExpressionParser {
             return;
         }
         
-        final ResourceLocation bracketResourceLocation = manager.getBracketResourceLocation();
         managerInstances.put(managerClass, manager);
+        registerInstance(manager);
+    }
+    
+    private void registerInstance(IRecipeManager manager) {
+        final ResourceLocation bracketResourceLocation = manager.getBracketResourceLocation();
+        final Class<? extends IRecipeManager> managerClass = manager.getClass();
+        
+        if(managerClass.getAnnotation(ZenCodeType.Name.class) == null) {
+            final String canonicalName = managerClass.getCanonicalName();
+            CraftTweakerAPI.logWarning("No Name Annotation found on manager '%s', it will not be registered!", canonicalName);
+            return;
+        }
+        
         registeredTypes.put(bracketResourceLocation, manager);
     }
     
     @Override
     public ParsedExpression parse(CodePosition position, ZSTokenParser tokens) throws ParseException {
-        StringBuilder builder = new StringBuilder();
-        while(tokens.optional(ZSTokenType.T_GREATER) == null) {
-            builder.append(tokens.next().content);
-            builder.append(tokens.getLastWhitespace());
+        final String name = ParseUtil.readContent(tokens);
+        final ResourceLocation resourceLocation = ResourceLocation.tryCreate(name);
+        if(resourceLocation == null) {
+            throw new ParseException(position, "Invalid ResourceLocation, expected: <recipetype:modid:location>");
         }
         
-        final ResourceLocation resourceLocation = new ResourceLocation(builder.toString());
         if(registeredTypes.containsKey(resourceLocation)) {
-            return getCall(builder.toString(), registeredTypes.get(resourceLocation), position);
-        } else {
-            return getCallFallback(builder.toString(), position);
+            return getCall(name, registeredTypes.get(resourceLocation), position);
         }
+        
+        if(Registry.RECIPE_TYPE.keySet().contains(resourceLocation)) {
+            return getCallFallback(name, position);
+        }
+        
+        //Unknown BEP
+        throw new ParseException(position, String.format("Unknown RecipeType: <recipetype:%s>", name));
     }
     
     private ParsedExpression getCallFallback(String location, CodePosition position) {

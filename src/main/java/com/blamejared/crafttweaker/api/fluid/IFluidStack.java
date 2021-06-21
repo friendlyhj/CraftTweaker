@@ -2,12 +2,18 @@ package com.blamejared.crafttweaker.api.fluid;
 
 import com.blamejared.crafttweaker.api.annotations.ZenRegister;
 import com.blamejared.crafttweaker.api.brackets.CommandStringDisplayable;
-import com.blamejared.crafttweaker.impl.fluid.MCFluid;
-import com.blamejared.crafttweaker.impl.util.MCResourceLocation;
+import com.blamejared.crafttweaker.api.data.IData;
+import com.blamejared.crafttweaker.api.item.IItemStack;
 import com.blamejared.crafttweaker_annotations.annotations.Document;
 import com.blamejared.crafttweaker_annotations.annotations.ZenWrapper;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fluids.FluidStack;
 import org.openzen.zencode.java.ZenCodeType;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @ZenRegister
 @ZenCodeType.Name("crafttweaker.api.fluid.IFluidStack")
@@ -21,8 +27,9 @@ public interface IFluidStack extends CommandStringDisplayable {
      * @return A MCResourceLocation representing the registry name.
      */
     @ZenCodeType.Getter("registryName")
-    default MCResourceLocation getRegistryName() {
-        return new MCResourceLocation(getInternal().getFluid().getRegistryName());
+    default ResourceLocation getRegistryName() {
+        
+        return getFluid().getRegistryName();
     }
     
     /**
@@ -35,6 +42,7 @@ public interface IFluidStack extends CommandStringDisplayable {
     @ZenCodeType.Method
     @ZenCodeType.Operator(ZenCodeType.OperatorType.CONTAINS)
     default boolean containsOther(IFluidStack other) {
+        
         return this.getInternal().containsFluid(other.getInternal());
     }
     
@@ -45,6 +53,7 @@ public interface IFluidStack extends CommandStringDisplayable {
      */
     @ZenCodeType.Getter("empty")
     default boolean isEmpty() {
+        
         return getInternal().isEmpty();
     }
     
@@ -55,6 +64,7 @@ public interface IFluidStack extends CommandStringDisplayable {
      */
     @ZenCodeType.Getter("amount")
     default int getAmount() {
+        
         return getInternal().getAmount();
     }
     
@@ -91,6 +101,13 @@ public interface IFluidStack extends CommandStringDisplayable {
     @ZenCodeType.Method
     IFluidStack mutable();
     
+    @ZenCodeType.Method
+    IFluidStack asImmutable();
+    
+    @ZenCodeType.Method
+    @ZenCodeType.Getter("isImmutable")
+    boolean isImmutable();
+    
     /**
      * Copies the stack. Only needed when mutable stacks are involved.
      *
@@ -106,10 +123,56 @@ public interface IFluidStack extends CommandStringDisplayable {
      */
     @ZenCodeType.Getter("fluid")
     @ZenCodeType.Caster(implicit = true)
-    MCFluid getFluid();
+    Fluid getFluid();
+    
+    /**
+     * Returns the NBT tag attached to this FluidStack.
+     *
+     * @return IData of the FluidStack's NBT Tag, null if it doesn't exist.
+     */
+    @ZenCodeType.Getter("tag")
+    @ZenCodeType.Method
+    IData getTag();
+    
+    /**
+     * Sets the tag for the FluidStack.
+     *
+     * @param tag The tag to set.
+     * @return This FluidStack if it is mutable, a new one with the changed property otherwise
+     * @docParam tag {Display: {lore: ["Hello"]}}
+     */
+    @ZenCodeType.Method
+    IFluidStack withTag(IData tag);
+    
+    /**
+     * Returns true if this FluidStack has a Tag
+     *
+     * @return true if tag is present.
+     */
+    @ZenCodeType.Getter("hasTag")
+    default boolean hasTag() {
+        return getInternal().hasTag();
+    }
     
     /**
      * Moddevs, use this to get the Vanilla version.
      */
     FluidStack getInternal();
+    
+    FluidStack getImmutableInternal();
+    
+    
+    @ZenCodeType.Caster(implicit = true)
+    default CTFluidIngredient asFluidIngredient(){
+        return new CTFluidIngredient.FluidStackIngredient(this);
+    }
+    
+    @ZenCodeType.Operator(ZenCodeType.OperatorType.OR)
+    default CTFluidIngredient asList(CTFluidIngredient other) {
+        List<CTFluidIngredient> elements = new ArrayList<>();
+        elements.add(asFluidIngredient());
+        elements.add(other);
+        return new CTFluidIngredient.CompoundFluidIngredient(elements);
+    }
+    
 }
